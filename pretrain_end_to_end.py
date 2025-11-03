@@ -160,9 +160,9 @@ def load_data(nodes_path, edges_path) -> Tuple[pd.DataFrame, pd.DataFrame]:
         raise FileNotFoundError(f"Sample image path {sample_img_path} does not exist. Please check image paths in nodes.csv.")
     return nodes_df, edges_df
 if __name__ == "__main__":
-    nodes_df, edges_df = load_data('./data/nodes.csv', './data/edges.csv')
+    nodes_df, edges_df = load_data('./data/processed/nodes.csv', './data/processed/edges.csv')
     if Path(MODEL_SAVE_PATH).exists():
         log(f"Model already trained and saved at {MODEL_SAVE_PATH}. To retrain, please delete the existing model file or rename it.")
     else:
-        # train_model(nodes_df, edges_df)
+        train_model(nodes_df, edges_df)
         pass
