@@ -164,5 +164,5 @@ if __name__ == "__main__":
     if Path(MODEL_SAVE_PATH).exists():
         log(f"Model already trained and saved at {MODEL_SAVE_PATH}. To retrain, please delete the existing model file or rename it.")
     else:
-        train_model(nodes_df, edges_df)
+        # train_model(nodes_df, edges_df)
         pass

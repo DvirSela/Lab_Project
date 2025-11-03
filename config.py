@@ -9,7 +9,7 @@ MODEL_SAVE_PATH = SAVE_DIR / "multimodal_encoder_final.pt"
 
 # Model / feature dims
 CLIP_MODEL_NAME = "openai/clip-vit-base-patch32"
-FUSED_DIM = 51
+FUSED_DIM = 512
 PROJ_DIM = 256 
 
 # Training hyperparams
