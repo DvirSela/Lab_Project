@@ -16,9 +16,10 @@ This document describes the performance improvements made to the codebase.
 - **Solution:** Implemented buffered logging with configurable buffer size (default: 10 messages)
 - **Impact:** ~10x reduction in file I/O operations during training
 - **Implementation:** 
-  - Messages are buffered in memory
+  - Messages are buffered in memory with thread-safe access using locks
   - Flushed to disk when buffer is full or explicitly requested
   - Added `flush_log()` function for manual flushing at critical points
+  - Thread-safe to prevent race conditions in multi-threaded environments
 
 ### 3. Memory-Efficient Dataset Loading
 **File:** `loader/graph_edge_dataset.py`
@@ -30,12 +31,15 @@ This document describes the performance improvements made to the codebase.
   - Uses `.loc[]` for efficient access
   - Converts to dict only when item is accessed
 
-### 4. Improved Numerical Stability
-**File:** `models/cross_attention_fusion.py`
-- **Issue:** Clamping with `1e-6` can cause numerical instability
-- **Solution:** Changed clamp minimum from `1e-6` to `1.0` in masked pooling
-- **Impact:** More stable training, prevents division by near-zero values
-- **Rationale:** Since we're summing mask values (which are 1.0 for valid tokens), the minimum realistic value is 1.0
+### 4. Thread-Safe Logging Buffer
+**File:** `utils/util.py`
+- **Issue:** Global buffer without thread-safety could cause race conditions
+- **Solution:** Added `threading.Lock` for synchronized access to log buffer
+- **Impact:** Safe for use in multi-threaded/multi-process training scenarios
+- **Details:**
+  - All buffer operations protected by lock
+  - Prevents data corruption in concurrent environments
+  - No performance overhead in single-threaded scenarios
 
 ### 5. Image Caching with LRU Cache
 **File:** `loader/multimodal_collator.py`

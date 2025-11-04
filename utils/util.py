@@ -1,31 +1,44 @@
 from pathlib import Path
 import torch
 import torch.nn.functional as F
+from threading import Lock
 from models.multimodal_graph_encoder import MultimodalGraphEncoder
 from config import CLIP_MODEL_NAME, FUSED_DIM, PROJ_DIM
 
 # Buffer for log messages to reduce file I/O
 _log_buffer = []
 _LOG_BUFFER_SIZE = 10
+_log_lock = Lock()  # Thread-safe access to log buffer
 
 def log(*args, **kwargs):
     """
     Optimized logging function with buffering to reduce file I/O.
     Flushes to file every _LOG_BUFFER_SIZE messages or when explicitly called with flush=True.
+    Thread-safe implementation using locks.
     """
+    # Extract flush parameter without mutating kwargs
+    should_flush_explicit = kwargs.get('flush', False)
+    kwargs_for_print = {k: v for k, v in kwargs.items() if k != 'flush'}
+    
     message = ' '.join(str(arg) for arg in args)
-    print(message, **kwargs)
+    print(message, **kwargs_for_print)
     
-    _log_buffer.append(message)
-    
-    # Flush to file if buffer is full or if flush is explicitly requested
-    should_flush = kwargs.pop('flush', False) or len(_log_buffer) >= _LOG_BUFFER_SIZE
-    
-    if should_flush:
-        flush_log()
+    with _log_lock:
+        _log_buffer.append(message)
+        
+        # Flush to file if buffer is full or if flush is explicitly requested
+        should_flush = should_flush_explicit or len(_log_buffer) >= _LOG_BUFFER_SIZE
+        
+        if should_flush:
+            _flush_log_unlocked()
 
 def flush_log():
-    """Flush buffered log messages to file."""
+    """Flush buffered log messages to file. Thread-safe."""
+    with _log_lock:
+        _flush_log_unlocked()
+
+def _flush_log_unlocked():
+    """Internal flush function. Must be called while holding _log_lock."""
     global _log_buffer
     if _log_buffer:
         with open('./training_log.txt', 'a') as f:

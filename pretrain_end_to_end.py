@@ -76,7 +76,7 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{EPOCHS}")
         
         for batch in pbar:
-            # Move data to device (reuse dict comprehension result)
+            # Transfer data to device with non-blocking for better GPU utilization
             inputs = {k: v.to(DEVICE, non_blocking=True) for k, v in batch.items()}
             
             with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):

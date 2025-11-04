@@ -1,0 +1,33 @@
+Initialized GraphEdgeDataset with 3 nodes and 2 valid edges.
+Test message 0
+Test message 1
+Test message 2
+Test message 3
+Test message 4
+Test message 5
+Test message 6
+Test message 7
+Test message 8
+Test message 9
+Test message 10
+Test message 11
+Test message 12
+Test message 13
+Test message 14
+Thread 0: Message 0
+Thread 0: Message 1
+Thread 0: Message 2
+Thread 0: Message 3
+Thread 1: Message 0
+Thread 0: Message 4
+Thread 2: Message 0
+Thread 1: Message 1
+Thread 2: Message 1
+Thread 1: Message 2
+Thread 2: Message 2
+Thread 1: Message 3
+Thread 2: Message 3
+Thread 1: Message 4
+Thread 2: Message 4
+Test with no flush
+Test with flush
