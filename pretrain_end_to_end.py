@@ -13,7 +13,7 @@ from config import DEVICE, SAVE_DIR, MODEL_SAVE_PATH, CLIP_MODEL_NAME, FUSED_DIM
 from models.multimodal_graph_encoder import MultimodalGraphEncoder
 from loader.graph_edge_dataset import GraphEdgeDataset
 from loader.multimodal_collator import MultimodalCollator
-from utils.util import log, info_nce_loss
+from utils.util import log, info_nce_loss, flush_log
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 torch.manual_seed(SEED)
@@ -76,8 +76,8 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{EPOCHS}")
         
         for batch in pbar:
-            optimizer.zero_grad()
-            inputs = {k: v.to(DEVICE) for k, v in batch.items()}
+            # Move data to device (reuse dict comprehension result)
+            inputs = {k: v.to(DEVICE, non_blocking=True) for k, v in batch.items()}
             
             with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
                 # Forward pass - returns (2*B, PROJ_DIM) tensors
@@ -100,6 +100,7 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
                 loss = loss_mm + GRAPH_LOSS_WEIGHT * loss_graph
             
             # Backward pass
+            optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -120,6 +121,7 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
         avg_loss_graph = epoch_loss_graph / len(dataloader)
         log(f"Epoch {epoch+1} Complete. Avg Loss: {avg_loss:.5f} "
             f"[L_mm: {avg_loss_mm:.5f}, L_graph: {avg_loss_graph:.5f}]")
+        flush_log()  # Ensure epoch completion is written to file
         
         # Save a checkpoint
         epoch_save_path = SAVE_DIR / f"multimodal_encoder_epoch_{epoch+1}.pt"
@@ -133,6 +135,7 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
 
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
     log(f"Training complete. Final model saved to {MODEL_SAVE_PATH}")
+    flush_log()  # Ensure final message is written to file
 
 
 def load_data(nodes_path, edges_path) -> Tuple[pd.DataFrame, pd.DataFrame]:

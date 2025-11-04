@@ -4,12 +4,34 @@ import torch.nn.functional as F
 from models.multimodal_graph_encoder import MultimodalGraphEncoder
 from config import CLIP_MODEL_NAME, FUSED_DIM, PROJ_DIM
 
+# Buffer for log messages to reduce file I/O
+_log_buffer = []
+_LOG_BUFFER_SIZE = 10
 
 def log(*args, **kwargs):
-    print(*args, **kwargs)
+    """
+    Optimized logging function with buffering to reduce file I/O.
+    Flushes to file every _LOG_BUFFER_SIZE messages or when explicitly called with flush=True.
+    """
+    message = ' '.join(str(arg) for arg in args)
+    print(message, **kwargs)
+    
+    _log_buffer.append(message)
+    
+    # Flush to file if buffer is full or if flush is explicitly requested
+    should_flush = kwargs.pop('flush', False) or len(_log_buffer) >= _LOG_BUFFER_SIZE
+    
+    if should_flush:
+        flush_log()
 
-    with open('./training_log.txt', 'a') as f:
-        print(*args, **kwargs, file=f)
+def flush_log():
+    """Flush buffered log messages to file."""
+    global _log_buffer
+    if _log_buffer:
+        with open('./training_log.txt', 'a') as f:
+            for msg in _log_buffer:
+                print(msg, file=f)
+        _log_buffer = []
 
 
 def info_nce_loss(logits: torch.Tensor) -> torch.Tensor:

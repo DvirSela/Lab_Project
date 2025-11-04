@@ -56,7 +56,8 @@ class CrossAttentionFusion(nn.Module):
         if text_mask is not None:
             mask = text_mask.float().unsqueeze(-1)
             # Pooled text representation from the text-attends-to-visual branch
-            text_pool = (t2v * mask).sum(dim=1) / (mask.sum(dim=1).clamp(min=1e-6))
+            # Use max to avoid division by very small numbers
+            text_pool = (t2v * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1.0)
         else:
             text_pool = t2v.mean(dim=1)
         
