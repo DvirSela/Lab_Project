@@ -76,6 +76,9 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{EPOCHS}")
         
         for batch in pbar:
+            # Zero gradients before forward pass (standard PyTorch pattern)
+            optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
+            
             # Transfer data to device with non-blocking for better GPU utilization
             inputs = {k: v.to(DEVICE, non_blocking=True) for k, v in batch.items()}
             
@@ -100,7 +103,6 @@ def train_model(nodes_df: pd.DataFrame, edges_df: pd.DataFrame):
                 loss = loss_mm + GRAPH_LOSS_WEIGHT * loss_graph
             
             # Backward pass
-            optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()

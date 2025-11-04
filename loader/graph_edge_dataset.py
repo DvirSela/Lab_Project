@@ -35,7 +35,9 @@ class GraphEdgeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[Dict, Dict]:
         src_id, dst_id = self.edges[idx]
-        # Use .loc[] for efficient indexed access and convert to dict on-the-fly
+        # Convert to dict on-the-fly. This trades slightly slower per-item access
+        # for significantly better memory efficiency (no full dict copy in memory).
+        # Best for large datasets where memory is more critical than microseconds per access.
         anchor_data = self.nodes_df.loc[src_id].to_dict()
         positive_data = self.nodes_df.loc[dst_id].to_dict()
         return anchor_data, positive_data

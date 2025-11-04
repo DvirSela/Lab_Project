@@ -10,12 +10,17 @@ class MultimodalCollator:
     Custom collate function to process a batch of (anchor, positive) pairs.
     It tokenizes text and processes images for the *entire* 2*B batch at once.
     Optimized with image caching to reduce redundant I/O operations.
+    
+    Note: The image cache is per-instance. If multiple MultimodalCollator instances
+    are created, each will have its own cache. For typical use cases with a single
+    DataLoader, this is the desired behavior to avoid cache pollution across different
+    datasets or configurations.
     """
     def __init__(self, tokenizer: CLIPTokenizer, processor: CLIPProcessor, cache_size: int = 128):
         self.tokenizer = tokenizer
         self.processor = processor
         self.default_image = Image.new('RGB', (224, 224), (0, 0, 0))
-        # Use LRU cache for frequently accessed images
+        # Use LRU cache for frequently accessed images (per-instance)
         self._load_image_cached = lru_cache(maxsize=cache_size)(self._load_image_uncached)
 
     def _load_image_uncached(self, img_path: str) -> Image.Image:

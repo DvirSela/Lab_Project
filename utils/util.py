@@ -17,8 +17,13 @@ def log(*args, **kwargs):
     Thread-safe implementation using locks.
     """
     # Extract flush parameter without mutating kwargs
-    should_flush_explicit = kwargs.get('flush', False)
-    kwargs_for_print = {k: v for k, v in kwargs.items() if k != 'flush'}
+    # Only filter kwargs if 'flush' is present to avoid unnecessary dict copy
+    should_flush_explicit = False
+    if 'flush' in kwargs:
+        should_flush_explicit = kwargs['flush']
+        kwargs_for_print = {k: v for k, v in kwargs.items() if k != 'flush'}
+    else:
+        kwargs_for_print = kwargs
     
     message = ' '.join(str(arg) for arg in args)
     print(message, **kwargs_for_print)
