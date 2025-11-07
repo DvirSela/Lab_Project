@@ -60,3 +60,31 @@ class MultimodalGraphEncoder(nn.Module):
         z_vis = F.normalize(self.vis_proj(vis_pool), dim=1)
         
         return z_graph, z_text, z_vis
+
+    @torch.no_grad()
+    def encode(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, pixel_values: torch.Tensor):
+        """
+        New method for inference. Runs the encoder and returns the 
+        intermediate features *before* the projection heads.
+        """
+        # --- Raw CLIP features ---
+        txt_out = self.text_model(input_ids=input_ids, attention_mask=attention_mask)
+        vis_out = self.vision_model(pixel_values=pixel_values)
+        
+        # [CLS] pools for baselines
+        text_cls_pool = txt_out.pooler_output
+        vis_cls_pool = vis_out.pooler_output
+
+        # --- Fused features ---
+        text_tokens = txt_out.last_hidden_state
+        img_patches = vis_out.last_hidden_state[:, 1:, :]
+        
+        # Note: self.fusion IS trained (from checkpoint)
+        fused_vec, text_pool_fused, vis_pool_fused = self.fusion(text_tokens, attention_mask, img_patches)
+        
+        return {
+            "fused": fused_vec,          # Our method
+            "text_only": text_cls_pool,  # Baseline 1
+            "image_only": vis_cls_pool, # Baseline 2
+            "concat": torch.cat([text_cls_pool, vis_cls_pool], dim=-1) # Baseline 3
+        }
