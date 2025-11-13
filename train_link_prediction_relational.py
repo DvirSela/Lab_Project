@@ -270,7 +270,6 @@ if __name__ == "__main__":
     except FileNotFoundError as e:
         log(str(e))
         exit()
-    exit()
 
     # 3. Create PyG Data and Split
     # Convert to a single numpy array first, then to tensor
@@ -324,7 +323,7 @@ if __name__ == "__main__":
 
     for mode in baseline_modes:
         log("\n" + "="*50)
-        log(f"🚀 STARTING RUN FOR: {mode.upper()} 🚀")
+        log(f"----------- STARTING RUN FOR: {mode.upper()} -----------")
         log("="*50)
 
         # 4a. Set the correct feature matrix
@@ -372,7 +371,7 @@ if __name__ == "__main__":
 
     # 5. Print Final Comparison Table
     log("\n" + "="*50)
-    log("🏁 FINAL RESULTS 🏁")
+    log("----------- FINAL RESULTS -----------")
     log("="*50)
     log(f"{'Method':<15} | {'Test MRR':<10} | {'Test Hits@10':<12}")
     log("-"*50)

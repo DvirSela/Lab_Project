@@ -1,6 +1,7 @@
 import torch
 from pathlib import Path
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using: {DEVICE}")
 
 # Paths
 SAVE_DIR = Path("checkpoints")
