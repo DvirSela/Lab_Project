@@ -14,7 +14,7 @@ import torch_geometric.transforms as T
 from torch_geometric.data import Data
 from torch_geometric.loader import LinkNeighborLoader
 
-from config import DEVICE, CLIP_MODEL_NAME, FUSED_DIM, PROJ_DIM, BATCH_SIZE, SEED, PRETRAINED_CHECKPOINT, FEATURE_CACHE_DIR, \
+from config import DEVICE, CLIP_MODEL_NAME, BATCH_SIZE, SEED, PRETRAINED_CHECKPOINT, FEATURE_CACHE_DIR, \
     GNN_HIDDEN_DIM, GNN_OUT_DIM, GNN_EPOCHS, GNN_LR
 from utils.util import log, relation_to_meta, load_pretrained_encoder
 from models.link_predictor import LinkPredictor
@@ -28,7 +28,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 FEATURE_CACHE_DIR.mkdir(exist_ok=True, parents=True)
 
-# Eval Config
 EVAL_NEG_SAMPLES = 100  # How many negatives to rank against for eval
 
 torch.manual_seed(SEED)
@@ -124,7 +123,7 @@ def train_gnn(
         batch_size=BATCH_SIZE,
         shuffle=True,
         neg_sampling_ratio=1.0,  # 1 negative sample per positive sample
-        num_neighbors=[10, 5],  # 2-hop neighborhood
+        num_neighbors=[10, 5], 
     )
 
     criterion = nn.BCEWithLogitsLoss()
@@ -133,11 +132,7 @@ def train_gnn(
     for batch in loader:
         batch = batch.to(DEVICE)
         optimizer.zero_grad()
-
-        # GNN provides node embeddings
         z = gnn_model(batch.x, batch.edge_index, batch.edge_type)
-
-        # Get embeddings for positive edges
         z_src_pos = z[batch.edge_label_index[0]]
         z_dst_pos = z[batch.edge_label_index[1]]
 
@@ -173,44 +168,34 @@ def test_gnn(
     gnn_model.eval()
     link_predictor.eval()
 
-    # Get final embeddings for ALL nodes using the training graph
     data = data.to(DEVICE)
     z = gnn_model(data.x, data.edge_index, data.edge_type)
 
     hits10_ranks = []
     mrr_ranks = []
 
-    # We evaluate on the 'val_pos_edge_index' or 'test_pos_edge_index'
-    # which contains the positive edges we need to rank.
+
     test_edges = data.edge_label_index
     num_test_edges = test_edges.shape[1]
 
     for i in tqdm(range(num_test_edges), desc="Evaluating links"):
-        # Get one positive edge
         src = test_edges[0, i]
         pos_dst = test_edges[1, i]
 
-        # Get embeddings
         z_src = z[src].unsqueeze(0)
         z_pos_dst = z[pos_dst].unsqueeze(0)
 
-        # Sample negative destinations
         neg_dst = torch.randint(
             0, data.num_nodes, (EVAL_NEG_SAMPLES,), device=DEVICE)
         z_neg_dst = z[neg_dst]
 
-        # Create embedding pairs
         z_src_rpt = z_src.repeat(EVAL_NEG_SAMPLES, 1)  # [N_neg, D]
 
-        # Calculate scores
         pos_score = link_predictor(z_src, z_pos_dst)
         neg_scores = link_predictor(z_src_rpt, z_neg_dst)
 
-        # --- Calculate Rank ---
-        # Combine positive score with all negative scores
         all_scores = torch.cat([pos_score.squeeze(1), neg_scores.squeeze(1)])
-        # Get the rank of the positive score (index 0)
-        # We sort in descending order
+
         sorted_indices = all_scores.argsort(descending=True)
         rank = (sorted_indices == 0).nonzero(as_tuple=True)[0].item() + 1
 
@@ -259,7 +244,6 @@ if __name__ == "__main__":
     num_nodes = len(nodes_df)
     log(f"Loaded {num_nodes} nodes and {len(edges_df)} edges.")
 
-    # 2. Generate/Load All Feature Matrices
     baseline_modes = ['fused', 'text_only', 'image_only', 'concat']
     try:
         feature_matrices = generate_features_all_nodes(
@@ -271,15 +255,12 @@ if __name__ == "__main__":
         log(str(e))
         exit()
 
-    # 3. Create PyG Data and Split
-    # Convert to a single numpy array first, then to tensor
     edge_index_np = np.array([
         edges_df['src_id'].values,
         edges_df['dst_id'].values
     ])
     edge_index = torch.from_numpy(edge_index_np).to(torch.long)
 
-    # map relation IDs to meta-relations using relation_to_meta
     edges_df['meta_rel_name'] = edges_df['rel_id'].map(relation_to_meta)
     edges_df['meta_rel_id'] = edges_df['meta_rel_name'].astype(
         'category').cat.codes
@@ -292,11 +273,9 @@ if __name__ == "__main__":
             f"Error: Number of meta-relations exceeds 31. Found: {num_of_meta_relations}")
         raise ValueError("Number of meta-relations exceeds 31.")
     log(f"Mapped original relations to {num_of_meta_relations} meta-relations.")
-    # Load the relation IDs as edge_type
     edge_type = torch.tensor(edges_df['meta_rel_id'].values, dtype=torch.long)
     num_relations = edge_type.max().item() + 1
     log(f"Found {num_relations} unique relation types.")
-    # We create a placeholder data object. We'll swap `data.x` in the loop.
     data = Data(num_nodes=num_nodes,
                 edge_index=edge_index, edge_type=edge_type)
 
@@ -308,17 +287,16 @@ if __name__ == "__main__":
     # It also *modifies* data.edge_index to *only* contain training edges
     # (to prevent message passing leakage)
     transform = T.RandomLinkSplit(
-        num_val=0.1,  # 10% for validation
-        num_test=0.1,  # 10% for testing
-        is_undirected=False,  # Our graph is directional
-        add_negative_train_samples=False,  # LinkNeighborLoader handles this
+        num_val=0.1, 
+        num_test=0.1, 
+        is_undirected=False, 
+        add_negative_train_samples=False,
     )
     train_data, val_data, test_data = transform(data)
     log(f"Split edges: {train_data.edge_index.shape[1]} train, "
         f"{val_data.edge_label_index.shape[1]} val, "
         f"{test_data.edge_label_index.shape[1]} test")
 
-    # 4. Run Training & Eval Loop for each feature set
     final_results = {}
 
     for mode in baseline_modes:
@@ -326,7 +304,6 @@ if __name__ == "__main__":
         log(f"----------- STARTING RUN FOR: {mode.upper()} -----------")
         log("="*50)
 
-        # 4a. Set the correct feature matrix
         X = feature_matrices[mode].to(DEVICE)
         train_data.x = X
         val_data.x = X
@@ -334,7 +311,6 @@ if __name__ == "__main__":
 
         in_dim = X.shape[1]
 
-        # 4b. Initialize GNN and Predictor
         gnn = R_GNN_Model(in_dim, GNN_HIDDEN_DIM,
                           GNN_OUT_DIM, num_relations).to(DEVICE)
         predictor = LinkPredictor(GNN_OUT_DIM).to(DEVICE)
@@ -345,12 +321,10 @@ if __name__ == "__main__":
         best_val_mrr = 0
         best_test_metrics = {}
 
-        # 4c. GNN Training Loop
         for epoch in range(1, GNN_EPOCHS + 1):
             loss = train_gnn(gnn, predictor, train_data, optimizer)
 
             if epoch % 5 == 0:
-                # 4d. Validation
                 val_metrics = test_gnn(gnn, predictor, val_data)
                 log(f"Epoch {epoch:03d} | Loss: {loss:.4f} | "
                     f"Val MRR: {val_metrics['MRR']:.4f} | "
@@ -359,7 +333,6 @@ if __name__ == "__main__":
                 if val_metrics['MRR'] > best_val_mrr:
                     best_val_mrr = val_metrics['MRR']
                     log(f"  -> New best val MRR! Testing...")
-                    # 4e. Test on best validation
                     best_test_metrics = test_gnn(gnn, predictor, test_data)
                     log(f"  -> Test MRR: {best_test_metrics['MRR']:.4f} | "
                         f"Test Hits@10: {best_test_metrics['Hits@10']:.4f}")
@@ -369,7 +342,6 @@ if __name__ == "__main__":
         del gnn, predictor, optimizer, X
         torch.cuda.empty_cache()
 
-    # 5. Print Final Comparison Table
     log("\n" + "="*50)
     log("----------- FINAL RESULTS -----------")
     log("="*50)
