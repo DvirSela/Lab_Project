@@ -2,6 +2,7 @@ import torch
 from typing import List, Tuple, Dict, Any
 from transformers import CLIPTokenizer, CLIPProcessor
 from PIL import Image
+from pathlib import Path
 
 class MultimodalCollator:
     """

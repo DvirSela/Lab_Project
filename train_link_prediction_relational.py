@@ -299,6 +299,9 @@ if __name__ == "__main__":
 
     final_results = {}
 
+    SAVE_DIR_GNN = Path("./saved_models/link_prediction")
+    SAVE_DIR_GNN.mkdir(parents=True, exist_ok=True)
+
     for mode in baseline_modes:
         log("\n" + "="*50)
         log(f"----------- STARTING RUN FOR: {mode.upper()} -----------")
@@ -332,10 +335,18 @@ if __name__ == "__main__":
 
                 if val_metrics['MRR'] > best_val_mrr:
                     best_val_mrr = val_metrics['MRR']
-                    log(f"  -> New best val MRR! Testing...")
+                    log(f"  -> New best val MRR! Testing and Saving...")
+                    
                     best_test_metrics = test_gnn(gnn, predictor, test_data)
                     log(f"  -> Test MRR: {best_test_metrics['MRR']:.4f} | "
                         f"Test Hits@10: {best_test_metrics['Hits@10']:.4f}")
+                    
+                    gnn_save_path = SAVE_DIR_GNN / f"gnn_{mode}_best.pt"
+                    pred_save_path = SAVE_DIR_GNN / f"predictor_{mode}_best.pt"
+                    
+                    torch.save(gnn.state_dict(), gnn_save_path)
+                    torch.save(predictor.state_dict(), pred_save_path)
+                    log(f"  -> Saved best models to {gnn_save_path}")
 
         final_results[mode] = best_test_metrics
         log(f"Finished run for {mode}. Clearing memory...")
